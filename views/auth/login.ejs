@@ -1,0 +1,66 @@
+  
+  
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | DSA Hub</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body style="background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%); min-height: 100vh;">
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold text-primary" href="/">DSA Hub</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="btn btn-primary" href="/signup">Sign Up</a>
+          </li>
+        </ul>
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="btn btn-outline-secondary me-2" href="/">Dashboard</a>
+            </li>
+          </ul>
+      </div>
+    </div>
+  </nav>
+  <main class="container d-flex align-items-center justify-content-center" style="min-height: 80vh;">
+    <div class="row w-100 justify-content-center">
+      <div class="col-md-6 col-lg-5">
+        <div class="card border-0 shadow-lg rounded-4">
+          <div class="card-body p-5">
+            <div class="text-center mb-4">
+              <img src="https://img.icons8.com/fluency/96/lock.png" alt="Login" style="width:64px;">
+              <h2 class="fw-bold mt-3 mb-2 text-primary">Welcome Back!</h2>
+              <p class="text-muted">Sign in to continue to your dashboard</p>
+            </div>
+            <form action="/login" method="POST">
+              <%- include('../partials/error') %>
+              <div class="mb-3">
+                <label for="email" class="form-label">Email or Username</label>
+                <input type="email" name="email" id="email" class="form-control form-control-lg rounded-3" placeholder="Enter your email or username" required />
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" name="password" id="password" class="form-control form-control-lg rounded-3" placeholder="Enter your password" required />
+              </div>
+              <button type="submit" class="btn btn-primary w-100 py-2 rounded-3 fw-bold">Sign In</button>
+            </form>
+            <div class="mt-4 text-center">
+              <span class="text-muted">Don't have an account?</span>
+              <a href="/signup" class="text-primary fw-bold ms-1">Sign Up</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
