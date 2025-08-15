@@ -88,7 +88,7 @@ app.use('/', (req, res, next) => {
   if (req.isLoggedIn) {
     return next(); // ✅ Logged in, proceed
   }
-  console.log('Redirecting to signuppage');
+ 
   return res.redirect('/login'); // ❌ Not logged in, go to signup
 });
 app.use('/', requestHandler);

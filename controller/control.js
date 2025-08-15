@@ -20,7 +20,7 @@ exports.getQuestion = async (req, res) => {
     solvedSet = new Set(freshUser?.solvedQuestions.map(id => id.toString()) || []);
   }
 
-  console.log('Solved Questions:', solvedSet);
+
 
   const html = cachedQuestions
     .map(q => q.renderCard(solvedSet.has(q._id.toString())))
