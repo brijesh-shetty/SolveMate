@@ -135,8 +135,17 @@ exports.postLogin = async(req, res) => {
     // Store user info in session
     req.session.isLoggedIn = true;
     req.session.user = user;
-    console.log('User logged in:', user.email);
-    res.redirect('/home'); // Redirect to home page
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.render("auth/login", {
+          errors: ["Login failed. Please try again."],
+          oldInput: { email }
+        });
+      }
+      console.log('User logged in:', user.email);
+      res.redirect('/home');
+    });
   };
 
 exports.postLogout = (req, res, next) => {

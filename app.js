@@ -2,204 +2,77 @@
 // Load environment variables
 // ====================
 require('dotenv').config();
-
-// ====================
-// Core Modules
+// Core Modules (built into Node.js)
 // ====================
 const path = require('path');
 
 // ====================
-// External Modules
+// External Modules (installed via npm)
 // ====================
 const express = require('express');
-const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const { default: mongoose } = require('mongoose');
 const session = require('express-session');
 const MongoDBStore = require('connect-mongodb-session')(session);
-const helmet = require('helmet');
-const cors = require('cors');
-const compression = require('compression');
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
 
 // ====================
-// Local Modules
+// Local Modules (your own files)
 // ====================
-const requestHandler = require('./routes/requestHandler');
-const authRouter = require('./routes/authHandler');
-const userRouter = require('./routes/user');
-const apiRouter = require('./routes/api');
-const { globalErrorHandler, notFoundHandler } = require('./middleware/errorHandler');
-const logger = require('./config/logger');
-
+const requestHandler = require('./routes/requestHandler'); // Main app routes
+const authRouter = require('./routes/authHandler');        // Authentication routes
+const userRouter = require('./routes/user');              // User-related routes
 // ====================
 // App Initialization
 // ====================
 const app = express();
+
+// ====================
+// Database Connection String (MongoDB Atlas)
+// ====================
 const DB_PATH = process.env.DB_PATH;
-const isProduction = process.env.NODE_ENV === 'production';
-
-// Trust reverse proxy (Render.com, Heroku, etc.)
-// Required for secure session cookies to work behind a load balancer
-app.set('trust proxy', 1);
 
 // ====================
-// Security Middleware
+// Middleware Setup
 // ====================
 
-// Helmet - Sets various HTTP headers for security
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-      imgSrc: ["'self'", "https://img.icons8.com", "data:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'", "https://cdn.jsdelivr.net"],
-    },
-  },
-}));
+// Parse form data from requests
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
-// CORS - Cross-Origin Resource Sharing
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
-
-// Rate Limiting - Prevent brute-force and DDoS
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: { error: 'Too many requests, please try again after 15 minutes' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/', limiter);
-
-// Stricter rate limit for auth endpoints (POST only — don't block viewing the forms)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30, // 30 login/signup attempts per 15 min
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    // Render proper EJS error pages instead of raw JSON
-    if (req.path === '/login' || req.originalUrl === '/login') {
-      return res.status(429).render('auth/login', {
-        errors: ['Too many login attempts. Please try again after 15 minutes.'],
-        oldInput: { email: '' }
-      });
-    }
-    return res.status(429).render('auth/signin', {
-      errors: ['Too many signup attempts. Please try again after 15 minutes.'],
-      oldInput: { firstName: '', lastName: '', email: '', password: '' }
-    });
-  },
-});
-// Only rate-limit POST requests (form submissions), not GET (viewing the page)
-app.post('/login', authLimiter);
-app.post('/signup', authLimiter);
-
-// ====================
-// General Middleware
-// ====================
-
-// Compression - Gzip responses for better performance
-app.use(compression());
-
-// Request Logging
-app.use(morgan(isProduction ? 'combined' : 'dev'));
-
-// Body Parsing
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
 
 // Set EJS as the view engine
 app.set('view engine', 'ejs');
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files from "public" folder
 
 // ====================
 // Session Store Configuration
 // ====================
 const store = new MongoDBStore({
-  uri: DB_PATH,
-  collection: 'sessions'
+  uri: DB_PATH,         // MongoDB URI
+  collection: 'sessions' // Session collection name
 });
 
-store.on('error', (error) => {
-  logger.error('Session store error:', error);
-});
-
+// Session middleware
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'fallback-secret-change-me',
-    resave: false,
-    saveUninitialized: false, // Changed: Don't save empty sessions
-    store,
-    cookie: {
-      secure: isProduction,       // HTTPS only in production
-      httpOnly: true,             // Prevent XSS access to cookies
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax'             // CSRF protection
-    }
+    secret: process.env.SESSION_SECRET,      // Used to sign the session ID cookie
+    resave: false,           // Prevents unnecessary session save
+    saveUninitialized: true, // Save new sessions even if not modified
+    store                    // Store session data in MongoDB
   })
 );
 
-// Attach login status to each request
+// Custom middleware to attach login status to each request
 app.use((req, res, next) => {
-  req.isLoggedIn = req.session.isLoggedIn || false;
-  req.user = req.session.user || null;
-  // Make isLoggedIn available in all EJS views
-  res.locals.isLoggedIn = req.isLoggedIn;
+  req.isLoggedIn = req.session.isLoggedIn;
+  req.user = req.session.user; // Attach user info to request
+   console.log(req.isLoggedIn); 
   next();
 });
 
 // ====================
-// Health Check & Monitoring Endpoints
-// ====================
-app.get('/health', (req, res) => {
-  const healthData = {
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: Math.floor(process.uptime()),
-    environment: process.env.NODE_ENV || 'development',
-    version: require('./package.json').version,
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    memory: {
-      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
-      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
-    }
-  };
-
-  const statusCode = healthData.database === 'connected' ? 200 : 503;
-  res.status(statusCode).json(healthData);
-});
-
-// Metrics endpoint (basic observability)
-app.get('/metrics', (req, res) => {
-  res.json({
-    uptime: process.uptime(),
-    responseTime: process.hrtime(),
-    memory: process.memoryUsage(),
-    cpu: process.cpuUsage(),
-    pid: process.pid,
-    nodeVersion: process.version,
-    platform: process.platform,
-    timestamp: Date.now()
-  });
-});
-
-// ====================
-// API Routes (JSON responses for external consumers)
-// ====================
-app.use('/api/v1', apiRouter);
-
-// ====================
-// View Routes (EJS templates)
+// Route Handling
 // ====================
 
 // Authentication routes (signup, login, logout)
@@ -207,25 +80,21 @@ app.use(authRouter);
 
 // Dashboard landing route
 app.get('/', (req, res) => {
-  res.render('auth/dashboard', { isLoggedIn: req.isLoggedIn });
+  res.render('auth/dashboard',{isLoggedIn: req.isLoggedIn});
 });
 
-// Auth guard for protected routes
+// Protect /filter route (only logged-in users can access)
 app.use('/', (req, res, next) => {
   if (req.isLoggedIn) {
-    return next();
+    return next(); // ✅ Logged in, proceed
   }
-  return res.redirect('/login');
+ 
+  return res.redirect('/login'); // ❌ Not logged in, go to signup
 });
-
 app.use('/', requestHandler);
-app.use('/', userRouter);
+app.use('/', userRouter); // User-related routes (e.g., toggle solved status)
+// Main application routes
 
-// ====================
-// Error Handling
-// ====================
-app.use(notFoundHandler);
-app.use(globalErrorHandler);
 
 // ====================
 // Server Start
@@ -235,26 +104,11 @@ const PORT = process.env.PORT || 3000;
 mongoose
   .connect(DB_PATH)
   .then(() => {
-    logger.info('✅ Connected to MongoDB Atlas');
+    console.log('Connected to Mongo');
     app.listen(PORT, () => {
-      logger.info(`🚀 SolveMate running on http://localhost:${PORT}`);
-      logger.info(`📊 Health check: http://localhost:${PORT}/health`);
-      logger.info(`📡 API: http://localhost:${PORT}/api/v1`);
-      logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Server running on address http://localhost:${PORT}`);
     });
   })
   .catch(err => {
-    logger.error('❌ Failed to connect to MongoDB:', err.message);
-    process.exit(1);
+    console.log('Error while connecting to Mongo: ', err);
   });
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received. Shutting down gracefully...');
-  mongoose.connection.close().then(() => {
-    logger.info('MongoDB connection closed.');
-    process.exit(0);
-  });
-});
-
-module.exports = app;
