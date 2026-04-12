@@ -10,7 +10,6 @@ const path = require('path');
 // External Modules (installed via npm)
 // ====================
 const express = require('express');
-const bodyParser = require('body-parser');
 const { default: mongoose } = require('mongoose');
 const session = require('express-session');
 const MongoDBStore = require('connect-mongodb-session')(session);
@@ -36,8 +35,8 @@ const DB_PATH = process.env.DB_PATH;
 // ====================
 
 // Parse form data from requests
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 
 // Set EJS as the view engine
