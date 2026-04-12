@@ -38,6 +38,10 @@ const app = express();
 const DB_PATH = process.env.DB_PATH;
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Trust reverse proxy (Render.com, Heroku, etc.)
+// Required for secure session cookies to work behind a load balancer
+app.set('trust proxy', 1);
+
 // ====================
 // Security Middleware
 // ====================
@@ -74,14 +78,29 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Stricter rate limit for auth endpoints
+// Stricter rate limit for auth endpoints (POST only — don't block viewing the forms)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20, // Only 20 login/signup attempts per 15 min
-  message: { error: 'Too many authentication attempts, please try again later' },
+  max: 30, // 30 login/signup attempts per 15 min
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    // Render proper EJS error pages instead of raw JSON
+    if (req.path === '/login' || req.originalUrl === '/login') {
+      return res.status(429).render('auth/login', {
+        errors: ['Too many login attempts. Please try again after 15 minutes.'],
+        oldInput: { email: '' }
+      });
+    }
+    return res.status(429).render('auth/signin', {
+      errors: ['Too many signup attempts. Please try again after 15 minutes.'],
+      oldInput: { firstName: '', lastName: '', email: '', password: '' }
+    });
+  },
 });
-app.use('/login', authLimiter);
-app.use('/signup', authLimiter);
+// Only rate-limit POST requests (form submissions), not GET (viewing the page)
+app.post('/login', authLimiter);
+app.post('/signup', authLimiter);
 
 // ====================
 // General Middleware
