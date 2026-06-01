@@ -20,6 +20,8 @@ const MongoDBStore = require('connect-mongodb-session')(session);
 const requestHandler = require('./routes/requestHandler'); // Main app routes
 const authRouter = require('./routes/authHandler');        // Authentication routes
 const userRouter = require('./routes/user');              // User-related routes
+const { runSeed } = require('./utils/seeder');
+const { clearCache } = require('./controller/control');
 // ====================
 // App Initialization
 // ====================
@@ -80,6 +82,34 @@ app.use(authRouter);
 // Dashboard landing route
 app.get('/', (req, res) => {
   res.render('auth/dashboard',{isLoggedIn: req.isLoggedIn});
+});
+
+// Database seeding route (temporary, can be removed after execution)
+app.get('/seed-database', async (req, res) => {
+  try {
+    const importAll = req.query.all === 'true';
+    const clearFirst = req.query.clear === 'true';
+    
+    // If clear=true, delete all existing questions first
+    if (clearFirst) {
+      const Question = require('./models/question');
+      const deleteResult = await Question.deleteMany({});
+      console.log(`🗑️ Cleared ${deleteResult.deletedCount} existing questions.`);
+    }
+    
+    console.log(`⏳ Starting seeding process (all=${importAll}, clear=${clearFirst})...`);
+    const result = await runSeed(importAll);
+    console.log('✅ Seeding completed:', result);
+    clearCache(); // Reset cached questions in controller
+    res.json({
+      message: 'Database seeding completed successfully!',
+      cleared: clearFirst,
+      ...result
+    });
+  } catch (err) {
+    console.error('❌ Seeding failed:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Protect /filter route (only logged-in users can access)
