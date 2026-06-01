@@ -12,16 +12,6 @@ async function loadQuestionsFromDb() {
   }
 }
 
-// Helper to extract unique tags from all questions (tag is now an array)
-function getUniqueTags(questions) {
-  const tagSet = new Set();
-  questions.forEach(q => {
-    const tags = Array.isArray(q.tag) ? q.tag : [q.tag];
-    tags.filter(Boolean).forEach(t => tagSet.add(t));
-  });
-  return [...tagSet].sort();
-}
-
 exports.getQuestion = async (req, res) => {
   await loadQuestionsFromDb();
 
@@ -36,7 +26,7 @@ exports.getQuestion = async (req, res) => {
     .join('');
 
   const companies = [...new Set(cachedQuestions.map(q => q.company).filter(Boolean))].sort();
-  const tags = getUniqueTags(cachedQuestions);
+  const tags = [...new Set(cachedQuestions.map(q => q.tag).filter(Boolean))].sort();
 
   res.render('index', { 
     questionsHtml: html, 
@@ -59,24 +49,18 @@ exports.filterQuestions = async (req, res) => {
     const freshUser = await User.findById(req.user._id).lean();
     solvedSet = new Set(freshUser?.solvedQuestions.map(id => id.toString()) || []);
   }
-  const filtered = cachedQuestions.filter(q => {
-    const diffMatch = difficulty === 'All' || q.dif?.toLowerCase() === difficulty.toLowerCase();
-    const companyMatch = company === 'All' || q.company?.toLowerCase() === company.toLowerCase();
-    // Tag is now an array — check if any tag in the array matches the selected tag
-    let tagMatch = true;
-    if (tag !== 'All') {
-      const qTags = Array.isArray(q.tag) ? q.tag : [q.tag];
-      tagMatch = qTags.some(t => t?.toLowerCase() === tag.toLowerCase());
-    }
-    return diffMatch && companyMatch && tagMatch;
-  });
+  const filtered = cachedQuestions.filter(q =>
+    (difficulty === 'All' || q.dif?.toLowerCase() === difficulty.toLowerCase()) &&
+    (company === 'All' || q.company?.toLowerCase() === company.toLowerCase()) &&
+    (tag === 'All' || q.tag?.toLowerCase() === tag.toLowerCase())
+  );
   
   const html = filtered
     .map(q => q.renderCard(solvedSet.has(q._id.toString())))
     .join('');
 
   const companies = [...new Set(cachedQuestions.map(q => q.company).filter(Boolean))].sort();
-  const tags = getUniqueTags(cachedQuestions);
+  const tags = [...new Set(cachedQuestions.map(q => q.tag).filter(Boolean))].sort();
 
   res.render('index', { 
     questionsHtml: html || '<p>No questions found.</p>', 
@@ -90,4 +74,5 @@ exports.filterQuestions = async (req, res) => {
 
 exports.clearCache = () => {
   cachedQuestions = [];
-};
+};
+

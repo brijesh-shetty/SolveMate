@@ -27,15 +27,6 @@ const DEFAULT_TARGET_COMPANIES = [
   'Salesforce'
 ];
 
-// Helper to normalize topics array for consistent storage
-function normalizeTopics(topics) {
-  if (!topics || !Array.isArray(topics) || topics.length === 0) {
-    return ['Other'];
-  }
-  // Capitalize each topic consistently
-  return topics.map(t => t.charAt(0).toUpperCase() + t.slice(1));
-}
-
 async function seed() {
   // Determine DB Path
   let dbUri = process.env.DB_PATH;
@@ -112,24 +103,32 @@ async function seed() {
       for (const q of questionsList) {
         if (!q.title || !q.link) continue;
         
-        // Define unique key to avoid adding the same question for the same company twice
-        const uniqueKey = `${company.toLowerCase()}_${q.title.toLowerCase()}`;
-        if (processedKeys.has(uniqueKey)) continue;
-        processedKeys.add(uniqueKey);
+        // Get topics — if empty, use ['Other']
+        const topics = (q.topics && Array.isArray(q.topics) && q.topics.length > 0)
+          ? q.topics
+          : ['Other'];
         
-        // Map fields
-        questionsToInsert.push({
-          company: company,
-          qunname: q.title,
-          tag: normalizeTopics(q.topics),
-          qunlink: q.link,
-          dif: q.difficulty ? q.difficulty.toLowerCase() : 'easy'
-        });
+        // Create one entry per topic tag
+        for (const topic of topics) {
+          const tag = topic.charAt(0).toUpperCase() + topic.slice(1);
+          // Unique key includes tag so same question can appear with different tags
+          const uniqueKey = `${company.toLowerCase()}_${q.title.toLowerCase()}_${tag.toLowerCase()}`;
+          if (processedKeys.has(uniqueKey)) continue;
+          processedKeys.add(uniqueKey);
+          
+          questionsToInsert.push({
+            company: company,
+            qunname: q.title,
+            tag: tag,
+            qunlink: q.link,
+            dif: q.difficulty ? q.difficulty.toLowerCase() : 'easy'
+          });
+        }
       }
     }
   }
   
-  console.log(`📊 Parsed ${questionsToInsert.length} unique company-question combinations.`);
+  console.log(`📊 Parsed ${questionsToInsert.length} unique company-question-tag combinations.`);
   
   if (questionsToInsert.length === 0) {
     console.log('⚠️ No new questions found to seed.');
@@ -139,14 +138,14 @@ async function seed() {
   
   console.log('🔄 Checking for existing questions in database to avoid duplicate records...');
   // Retrieve all existing questions from the database to build a cache
-  const existingQuestions = await Question.find({}, { company: 1, qunname: 1 }).lean();
+  const existingQuestions = await Question.find({}, { company: 1, qunname: 1, tag: 1 }).lean();
   const existingKeys = new Set(
-    existingQuestions.map(q => `${q.company.toLowerCase()}_${q.qunname.toLowerCase()}`)
+    existingQuestions.map(q => `${q.company.toLowerCase()}_${q.qunname.toLowerCase()}_${(q.tag || '').toLowerCase()}`)
   );
   
   // Filter out questions that are already in the DB
   const newQuestions = questionsToInsert.filter(q => {
-    const key = `${q.company.toLowerCase()}_${q.qunname.toLowerCase()}`;
+    const key = `${q.company.toLowerCase()}_${q.qunname.toLowerCase()}_${q.tag.toLowerCase()}`;
     return !existingKeys.has(key);
   });
   
