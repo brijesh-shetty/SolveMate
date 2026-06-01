@@ -37,12 +37,43 @@
     <!-- Pagination -->
     <% if (totalPages > 1) { %>
     <nav aria-label="Page navigation">
-      <ul class="pagination justify-content-center">
-        <% for (let i = 1; i <= totalPages; i++) { %>
+      <ul class="pagination justify-content-center flex-wrap">
+        <%
+          const maxVisible = 5;
+          let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+          let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+          if (endPage - startPage < maxVisible - 1) {
+            startPage = Math.max(1, endPage - maxVisible + 1);
+          }
+        %>
+        <!-- First & Prev -->
+        <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+          <a class="page-link" href="#" onclick="goToPage(1); return false;">&laquo; First</a>
+        </li>
+        <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+          <a class="page-link" href="#" onclick="goToPage(<%= currentPage - 1 %>); return false;">&lsaquo; Prev</a>
+        </li>
+
+        <!-- Page Numbers -->
+        <% if (startPage > 1) { %>
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        <% } %>
+        <% for (let i = startPage; i <= endPage; i++) { %>
           <li class="page-item <%= i === currentPage ? 'active' : '' %>">
             <a class="page-link" href="#" onclick="goToPage(<%= i %>); return false;"><%= i %></a>
           </li>
         <% } %>
+        <% if (endPage < totalPages) { %>
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        <% } %>
+
+        <!-- Next & Last -->
+        <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+          <a class="page-link" href="#" onclick="goToPage(<%= currentPage + 1 %>); return false;">Next &rsaquo;</a>
+        </li>
+        <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+          <a class="page-link" href="#" onclick="goToPage(<%= totalPages %>); return false;">Last &raquo;</a>
+        </li>
       </ul>
     </nav>
     <% } %>
